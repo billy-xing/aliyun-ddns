@@ -2,34 +2,51 @@
 using Quartz;
 using Quartz.Impl;
 using System.Threading;
+using Quartz.Xml;
+using Quartz.Simpl;
+using System.Runtime.Loader;
 
 namespace Luna.Net.DDNS.Aliyun
 {
     class Program
     {
         private static IScheduler scheduler;
+        static readonly System.Threading.CancellationTokenSource _cs = new System.Threading.CancellationTokenSource();
 
         static void Main(string[] args)
         {
-            var cts = new CancellationTokenSource();
+            // var cts = new CancellationTokenSource();
 
-            scheduler = StdSchedulerFactory.GetDefaultScheduler().Result;
+            AppDomain.CurrentDomain.ProcessExit += Processor_ProcessExit;
+            AssemblyLoadContext.Default.Unloading += Processor_Unloading;
+            Console.CancelKeyPress += Processor_CancelKeyPress;
+
+            XMLSchedulingDataProcessor processor = new XMLSchedulingDataProcessor(new SimpleTypeLoadHelper());
+            ISchedulerFactory sf = new StdSchedulerFactory();
+            scheduler = sf.GetScheduler().Result;
+
+            IJobDetail job = JobBuilder.Create<DdnsJob>().WithIdentity("DdnsJob", "DdnsJobGroup").Build();
+
+            int sec = 300;
+            if (!int.TryParse(ConfigUtil.GetConfigVariableValue("RefreshIntervalInSecond", "300"), out sec))
+                sec = 300;
+
+            ISimpleTrigger trigger = (ISimpleTrigger)TriggerBuilder.Create()
+                  .WithIdentity("DdnsJobTrigger", "DdnsJobTriggerGroup")
+                  .StartNow().WithSimpleSchedule(x => x.WithIntervalInSeconds(sec).RepeatForever()).Build();
+
+            scheduler.ScheduleJob(job, trigger);
+
+            // processor.ProcessFileAndScheduleJobs("~/quartz_jobs.xml", scheduler);
+
+            // scheduler = StdSchedulerFactory.GetDefaultScheduler().Result;
 
             scheduler.Start();
-            Console.WriteLine($"{DateTime.Now} 后台服务，启动成功！");
+            Console.WriteLine($"[{DateTime.Now}]:后台服务，启动成功！");
 
-            AppDomain.CurrentDomain.ProcessExit += (s, e) =>
-            {
-                Console.WriteLine($"{DateTime.Now} 后台服务，准备退出！");
+           
 
-                cts.Cancel();    //设置IsCancellationRequested=true
-                scheduler.Shutdown();   //等待 scheduler 结束执行
-
-                Console.WriteLine($"{DateTime.Now} 恭喜，服务程序已正常退出！");
-                Environment.Exit(0);
-            };
-
-            while (!cts.IsCancellationRequested)
+            while (!_cs.IsCancellationRequested)
             {
                 System.Threading.Thread.Sleep(1000);
             }
@@ -39,7 +56,32 @@ namespace Luna.Net.DDNS.Aliyun
             
         }
 
-        
-        
+        #region "Common Utils"
+        private static void Processor_ProcessExit(object sender, EventArgs e)
+        {
+            if (!_cs.IsCancellationRequested)
+            {
+                _cs.Cancel();
+            }
+        }
+
+        private static void Processor_Unloading(AssemblyLoadContext obj)
+        {
+            if (!_cs.IsCancellationRequested)
+            {
+                _cs.Cancel();
+            }
+        }
+
+        private static void Processor_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
+        {
+            if (!_cs.IsCancellationRequested)
+            {
+                _cs.Cancel();
+            }
+        }
+
+        #endregion
+
     }
 }

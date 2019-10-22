@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace Luna.Net.DDNS.Aliyun
 {
@@ -32,26 +33,28 @@ namespace Luna.Net.DDNS.Aliyun
                 var response = client.GetAcsResponse(request);
                 if (response.TotalCount > 0)
                 {
-                    var rec = response.DomainRecords[0];
-                    if (rec.Value != publicIP)
+                    var rec = response.DomainRecords.FirstOrDefault(t=>t.RR.Equals(request.RRKeyWord, StringComparison.CurrentCultureIgnoreCase));
+                    if (rec != null && rec.Value != publicIP)
                     {
                         var reqChange = new UpdateDomainRecordRequest();
                         reqChange.RecordId = rec.RecordId;
+                        reqChange.RR = rec.RR;
+                        reqChange.Type = rec.Type;
                         reqChange.Value = publicIP;
 
                         var respChange = client.GetAcsResponse(reqChange);
-                        Console.WriteLine("Changed success");
+                        Console.WriteLine($"[{DateTime.Now}]:{rec.RR}.{rec.DomainName} Changed to IP {publicIP} success");
                     }
                 }
                 // Console.WriteLine(System.Text.Encoding.Default.GetString(response.HttpResponse.Content));
             }
             catch (ServerException e)
             {
-                Console.WriteLine(e);
+                Console.WriteLine($"[{DateTime.Now}]【Exception】{e}");
             }
             catch (ClientException e)
             {
-                Console.WriteLine(e);
+                Console.WriteLine($"[{DateTime.Now}]【Exception】{e}");
             }
 
             return Task.CompletedTask;
