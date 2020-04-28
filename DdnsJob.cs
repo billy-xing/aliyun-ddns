@@ -15,9 +15,16 @@ namespace Luna.Net.DDNS.Aliyun
 {
     public class DdnsJob : IJob
     {
+        const string CACHEKEY_CachedIP = "CachedIP";
         public Task Execute(IJobExecutionContext context)
         {
             var publicIP = GetPublicIP();
+            var cachedIP = CacheHelper.GetCacheValue<string>(CACHEKEY_CachedIP);
+
+            if(!string.IsNullOrWhiteSpace(cachedIP) && cachedIP.Equals(publicIP, StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.CompletedTask;
+            }
 
             IClientProfile profile = DefaultProfile.GetProfile("cn-hangzhou", ConfigUtil.GetConfigVariableValue("accessKeyId"), ConfigUtil.GetConfigVariableValue("accessSecret"));
             DefaultAcsClient client = new DefaultAcsClient(profile);
@@ -43,6 +50,9 @@ namespace Luna.Net.DDNS.Aliyun
                         reqChange.Value = publicIP;
 
                         var respChange = client.GetAcsResponse(reqChange);
+                        
+                        CacheHelper.SetCacheValue(CACHEKEY_CachedIP, publicIP);
+
                         Console.WriteLine($"[{DateTime.Now}]:{rec.RR}.{rec.DomainName} Changed to IP {publicIP} success");
                     }
                 }
@@ -60,19 +70,37 @@ namespace Luna.Net.DDNS.Aliyun
             return Task.CompletedTask;
         }
 
+        //public string GetPublicIP()
+        //{
+        //    var host = "http://ip.taobao.com/";
+        //    var url = "/service/getIpInfo2.php?ip=myip";
+
+        //    var client = new RestClient(host);
+        //    var resp = client.Get(new RestRequest(url));
+        //    var result = JsonConvert.DeserializeAnonymousType(resp.Content, new { code = 0, data = new { ip = string.Empty } });
+        //    if (result != null && result.code == 0)
+        //    {
+        //        return result.data.ip;
+        //    }
+        //    return string.Empty;
+        //}
+
         public string GetPublicIP()
         {
-            var host = "http://ip.taobao.com/";
-            var url = "/service/getIpInfo2.php?ip=myip";
+            var host = "https://api.myip.com/";
+            var url = "";
 
             var client = new RestClient(host);
             var resp = client.Get(new RestRequest(url));
-            var result = JsonConvert.DeserializeAnonymousType(resp.Content, new { code = 0, data = new { ip = string.Empty } });
-            if (result != null && result.code == 0)
+            var result = JsonConvert.DeserializeAnonymousType(resp.Content, new { ip = string.Empty });
+            if (result != null )
             {
-                return result.data.ip;
+                return result.ip;
             }
             return string.Empty;
         }
+
+
+        
     }
 }
