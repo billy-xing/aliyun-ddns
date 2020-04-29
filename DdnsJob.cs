@@ -10,6 +10,8 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using System.Linq;
+using System.Diagnostics;
+using System.Threading;
 
 namespace Luna.Net.DDNS.Aliyun
 {
@@ -18,7 +20,7 @@ namespace Luna.Net.DDNS.Aliyun
         const string CACHEKEY_CachedIP = "CachedIP";
         public Task Execute(IJobExecutionContext context)
         {
-            var publicIP = GetPublicIP();
+            var publicIP = GetPublicIPEx();
             var cachedIP = CacheHelper.GetCacheValue<string>(CACHEKEY_CachedIP);
 
             if(!string.IsNullOrWhiteSpace(cachedIP) && cachedIP.Equals(publicIP, StringComparison.OrdinalIgnoreCase))
@@ -100,7 +102,83 @@ namespace Luna.Net.DDNS.Aliyun
             return string.Empty;
         }
 
+        public string GetPublicIPEx()
+        {
+            var publicIP = string.Empty;
+            //var lst = new List<string>() {
+            //"https://cip.cc",
+            //"https://api.myip.com/",
+            //"http://www.trackip.net/i",
+            ////"https://ip.cn",
+            //"https://myip.dnsomatic.com",
+            ////"https://ip.d3vm.net",
+            //"https://ifconfig.me/ip",
+            ////"https://ipecho.net/plain",
+            //"http://ipinfo.io/ip"
+            //};
 
+            var lst = ConfigUtil.GetConfigVariableValue("PublicIPUrlList", "https://api.myip.com/").Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+
+            CancellationTokenSource cts = new CancellationTokenSource();
+            Parallel.ForEach(lst, (url,state) =>
+            {
+                url = url.Trim();
+                Stopwatch sw = Stopwatch.StartNew();
+                try
+                {
+                    using (System.Net.Http.HttpClient client = new System.Net.Http.HttpClient())
+                    {
+                        var content = client.GetAsync(url,cts.Token).Result.Content.ReadAsStringAsync().Result;
+                        if (state.IsStopped)
+                            return;
+                        var ip = ExtractIP(content);
+                        Console.WriteLine($"url:{url},ip:{ip},time:{sw.ElapsedMilliseconds}");
+                        if (!string.IsNullOrEmpty(ip))
+                        {
+                            publicIP = ip;
+                            state.Stop();
+                            cts.Cancel();
+                            return;
+                        }
+                    }
+                }
+                catch(TaskCanceledException)
+                {
+
+                }
+                catch(AggregateException ex)
+                {
+                    foreach(var innerEx in ex.InnerExceptions)
+                    {
+                        if(!(innerEx is TaskCanceledException))
+                        {
+                            Console.WriteLine($"url:{url},time:{sw.ElapsedMilliseconds},error:{innerEx.Message}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+
+                    Console.WriteLine($"url:{url},time:{sw.ElapsedMilliseconds},error:{ex.Message}");
+                }
+                
+                sw.Stop();
+                
+            });
+
+            return publicIP;
+
+        }
+
+        public string ExtractIP(string text)
+        {
+            System.Text.RegularExpressions.Regex r = new System.Text.RegularExpressions.Regex(@"(((25[0-5]|2[0-4]\d|((1\d{2})|([1-9]?\d)))\.){3}(25[0-5]|2[0-4]\d|((1\d{2})|([1-9]?\d))))");
+            var m = r.Match(text);
+
+            if (m.Success)
+                return m.Value;
+            return null;
+        }
         
     }
 }
