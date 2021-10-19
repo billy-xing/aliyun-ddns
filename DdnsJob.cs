@@ -31,9 +31,6 @@ namespace Luna.Net.DDNS.Aliyun
             IClientProfile profile = DefaultProfile.GetProfile("cn-hangzhou", ConfigUtil.GetConfigVariableValue("accessKeyId"), ConfigUtil.GetConfigVariableValue("accessSecret"));
             DefaultAcsClient client = new DefaultAcsClient(profile);
             var request = new DescribeDomainRecordsRequest();
-            //request.Value = "3.0.3.0";
-            //request.Type = "A";
-            //request.RR = "apitest1";
             request.DomainName = ConfigUtil.GetConfigVariableValue("DomainName");
             request.TypeKeyWord = ConfigUtil.GetConfigVariableValue("DomainRecordType");
             request.RRKeyWord = ConfigUtil.GetConfigVariableValue("DomainRecordRR");
@@ -58,7 +55,6 @@ namespace Luna.Net.DDNS.Aliyun
                         Console.WriteLine($"[{DateTime.Now}]:{rec.RR}.{rec.DomainName} Changed to IP {publicIP} success");
                     }
                 }
-                // Console.WriteLine(System.Text.Encoding.Default.GetString(response.HttpResponse.Content));
             }
             catch (ServerException e)
             {
@@ -71,21 +67,6 @@ namespace Luna.Net.DDNS.Aliyun
 
             return Task.CompletedTask;
         }
-
-        //public string GetPublicIP()
-        //{
-        //    var host = "http://ip.taobao.com/";
-        //    var url = "/service/getIpInfo2.php?ip=myip";
-
-        //    var client = new RestClient(host);
-        //    var resp = client.Get(new RestRequest(url));
-        //    var result = JsonConvert.DeserializeAnonymousType(resp.Content, new { code = 0, data = new { ip = string.Empty } });
-        //    if (result != null && result.code == 0)
-        //    {
-        //        return result.data.ip;
-        //    }
-        //    return string.Empty;
-        //}
 
         public string GetPublicIP()
         {
@@ -105,17 +86,6 @@ namespace Luna.Net.DDNS.Aliyun
         public string GetPublicIPEx()
         {
             var publicIP = string.Empty;
-            //var lst = new List<string>() {
-            //"https://cip.cc",
-            //"https://api.myip.com/",
-            //"http://www.trackip.net/i",
-            ////"https://ip.cn",
-            //"https://myip.dnsomatic.com",
-            ////"https://ip.d3vm.net",
-            //"https://ifconfig.me/ip",
-            ////"https://ipecho.net/plain",
-            //"http://ipinfo.io/ip"
-            //};
 
             var lst = ConfigUtil.GetConfigVariableValue("PublicIPUrlList", "https://api.myip.com/").Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
 

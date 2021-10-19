@@ -22,7 +22,7 @@
         <job-name>DDNSJob</job-name>
         <job-group>DDNS</job-group>
         <start-time>2019-10-01T00:00:00+08:00</start-time>
-        <!--没隔5分钟触发一次-->
+        <!--每隔5分钟触发一次-->
         <cron-expression>0 0/5 * * * ?</cron-expression>
       </cron>
     </trigger>
